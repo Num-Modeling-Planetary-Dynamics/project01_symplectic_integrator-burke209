@@ -71,7 +71,6 @@ def kep_drift(mu,rvec_in,vvec_in,a,ecc,dt):
         #initial guess
         k = 0.85
         E = [M +np.sin(M)* k * ecc]
-        print(E)
         err_arr = [0.0]
         i=0
         while True :
@@ -84,9 +83,7 @@ def kep_drift(mu,rvec_in,vvec_in,a,ecc,dt):
             delta3 = 0.0-(f_E/(df_E+(0.5*delta2*df2_E)+((1./6.)*(delta2**2)*df3_E)))
             
             E_new =E[i] + delta3
-            print(E_new)
             err = (E_new-E[i])/E_new #use this less than 10^-12 instead of accuracy in deg
-            print(err)
             #acc = E_new-E[i]
             E = np.append(E,E_new)
             err_arr.append(err)
@@ -96,33 +93,41 @@ def kep_drift(mu,rvec_in,vvec_in,a,ecc,dt):
                 break
         return(E[-1])
     
-    n = np.sqrt(mu / a**3)  # Kepler's 3rd law to get the mean motion
-    rvec0 = rvec_in
-    vvec0 = vvec_in
-    rmag0 = np.linalg.norm(rvec0,axis=1)
-    E0 = np.arccos(-(rmag0-a)/(a * ecc))
-    print(E0)
-    if np.sign(np.vdot(rvec0,vvec0)) < 0.0:
-        E0 = 2*np.pi - E0
-    M0 = E0 - ecc * np.sin(E0)
-    M = M0 + n + dt
-    print(M)
-    E = danby(M,ecc)
-    dE = E-E0
+    for i in range(rvec_in.shape[0]):
+        rvec0 = rvec_in[i,:]
+        vvec0 = vvec_in[i,:]
+        a0 = a[i]
+        mu0 = mu[i]
+        ecc0 = ecc[i]
     
-    #now implement f and g functions to advance cartesion vectors
-    f = a / rmag0 * (np.cos(dE) - 1.0) + 1.0
-    g = dt + 1.0 / n * (np.sin(dE)-dE)
+        n0 = np.sqrt(mu0 / a0**3)  # Kepler's 3rd law to get the mean motion
+        rmag0 = np.linalg.norm(rvec0)
+        E0 = np.arccos(-(rmag0-a0)/(a0 * ecc0))
+        if np.sign(np.vdot(rvec0,vvec0)) < 0.0:
+            E0 = 2*np.pi - E0
+        M0 = E0 - ecc0 * np.sin(E0)
+        M = M0 + n0 + dt
+        E = danby(M,ecc0)
+        dE = E-E0
+        
+        #now implement f and g functions to advance cartesion vectors
+        f = a0 / rmag0 * (np.cos(dE) - 1.0) + 1.0
+        g = dt + 1.0 / n0 * (np.sin(dE)-dE)
+        
+        rvec = f * rvec0 +g *vvec0
+        print(rvec)
+        rmag = np.linalg.norm(rvec)
+        
+        fdot = -a0**2 / (rmag * rmag0) * n0 * np.sin(dE)
+        gdot = a0 / rmag * (np.cos(dE) - 1.0) + 1.0
     
-    rvec = f * rvec0 +g *vvec0
-    rmag = np.linalg.norm(rvec)
+        vvec = fdot * rvec0 + gdot * vvec0
+        print(vvec)
+        
+        rvec_in[i,:] = rvec
+        vvec_in[i,:] = vvec
     
-    fdot = -a**2 / (rmag * rmag0) * n * np.sin(dE)
-    gdot = a / rmag * (np.cos(dE) - 1.0) + 1.0
-
-    vvec = fdot * rvec0 + gdot * vvec0
-    
-    return rvec,vvec
+    return rvec_in,vvec_in
 
 #update barycentric velocities
 def kick(Gmass, rvec,vbvec,dt):
@@ -168,9 +173,9 @@ for object_val in object_val_arr:
 for object_val in object_val_arr:
     rhvec.append(object_vec[str(object_val)]['rvec'])
     vhvec.append(object_vec[str(object_val)]['vvec'])
-    a.append(np.float64(object_vec[str(object_val)]['el'][0]))
-    ecc.append(object_vec[str(object_val)]['el'][1])
-    mass.append(object_vec[str(object_val)]['mass'])
+    a.append([np.float64(object_vec[str(object_val)]['el'][0])])
+    ecc.append([object_vec[str(object_val)]['el'][1]])
+    mass.append([object_vec[str(object_val)]['mass']])
 
 rhvec = np.array(rhvec)
 vhvec = np.array(vhvec)
@@ -188,7 +193,7 @@ vbvec = vh2vb(vhvec,Gmass,Gmtot)
 #get step size for neptune
 dt = get_step(a[0],mu[0])
 dth = 0.5*dt
-tfinal = 1e5
+tfinal = 1e5*(365.25 * 86400)
 timestep = np.arange(0,tfinal,dt)
 t_arr = []
 rvec_arr = []
