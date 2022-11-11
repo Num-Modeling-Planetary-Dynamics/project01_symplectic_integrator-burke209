@@ -76,15 +76,18 @@ def lindrift(vbvec,rhvec,Gmass,GMsun, dt):
 #vbvec is an n x 3 array containing barycentric velocity components for n bodies
 #Gmass is an n-length array 
     #vbvec = barycentric velocities
+    rhvec_out = rhvec.copy()
     pt = np.sum(Gmass * vbvec,axis=0) / GMsun
     #rhvec is an nX3 array, lindrift is performed on all planets
-    rhvec += pt *dt
-    return rhvec
+    rhvec_out += pt *dt
+    return rhvec_out
 
 #calculate keplerian change in barycentric velocity and heliocentric position
-def kep_drift(mu,rvec_in,vvec_in,dt):
+def kep_drift(mu,rvec_input,vvec_input,dt):
 #rvec_in is an n x 3 array containing heliocentric position components for n bodies
 #vvec_in is an n x 3 array containing barycentric velocity components for n bodies
+    rvec_in = rvec_input.copy()
+    vvec_in = vvec_input.copy()
     def danby(M,ecc):
         #initial guess
         k = 0.85
@@ -152,6 +155,7 @@ def kick(Gmass, rvec,vbvec,dt):
 #rvec is an n x 3 array containing heliocentric position components for n bodies
 #vbvec is an n x 3 array containing barycentric velocity components for n bodies
     n = rvec.shape[0]
+    vbvec_out = vbvec.copy()
     acc = []
     Gmass_flat = Gmass.flatten()
     #calculate each ith body separately
@@ -162,8 +166,8 @@ def kick(Gmass, rvec,vbvec,dt):
         irij3 = Gmass_flat / irij3
         acc.append([np.sum(drvec.T * irij3)])
     
-    vbvec += acc * dt
-    return vbvec
+    vbvec_out += acc * dt
+    return vbvec_out
 
 def xv2el(rhvec,vhvec,mu):
 #rhvec = (timestep x 3 array containing all pos values for one body from simulation)
@@ -192,9 +196,9 @@ def xv2el(rhvec,vhvec,mu):
     M = E - ecc * np.sin(E)
     lam = np.mod(M + varpi,2*np.pi)
     
-    orbit = {'a':a, 'ecc':ecc, 'I':I, 'lon_asc_node':long_ascend,
-            'true_anom':true_anomaly, 'arg_peri':arg_periapsis, 
-            'E':E,'M':M,'mean_long':lam, 'long_peri':varpi}
+    orbit = {'a':a, 'ecc':ecc, 'I':np.rad2deg(I), 'lon_asc_node':np.rad2deg(long_ascend),
+            'true_anom':np.rad2deg(true_anomaly), 'arg_peri':np.rad2deg(arg_periapsis), 
+            'E':np.rad2deg(E),'M':np.rad2deg(M),'mean_long':np.rad2deg(lam), 'long_peri':np.rad2deg(varpi)}
 
     return orbit
 
@@ -218,7 +222,7 @@ def get_energy(G, Gmcb, Gmass, Gmtot, rhvec_in, vhvec_in):
             return np.sum(drvec.T * irij, axis=1)
     
         n = rhvec.shape[0]
-        pe = (-Gmcb * np.sum(Gmass * rmag_1) - np.sum([pe_one(Gmass.flatten(), rhvec, i) for i in range(n - 1)])) / G
+        pe = (-Gmcb * np.sum(Gmass * rmag_1) - np.sum([pe_one(Gmass.flatten(), rhvec, i) for i in range(n)])) / G
         tot_arr.append(ke+pe)
     return tot_arr
 #------------------------------------------------------------------------------
@@ -328,12 +332,12 @@ energy = get_energy(G, G*Msun, Gmass, Gmtot, rhvec_arr_bodies, vhvec_arr_bodies)
 dE_E0 = (energy - energy[0]) / energy[0]
 
 #plot resonance angle
-plt.plot(timestep[::50]/365.25/86400,phi[::50])
+plt.plot(timestep[::30]/365.25/86400,phi[::30])
 plt.savefig('../plots/phi_vs_t.png',dpi=300)
 plt.clf()
 
 #plot energy error
-plt.plot(timestep[::50]/365.25/86400,dE_E0[::50])
+plt.plot(timestep[::30]/365.25/86400,dE_E0[::30])
 plt.savefig('../plots/dE_E0_vs_t.png',dpi=300)
 plt.clf()
 
